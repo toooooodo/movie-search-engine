@@ -7,5 +7,6 @@ urlpatterns = [
     path("movie_search/", views.do_search, name='do_search'),
     path('movie_detail/', views.movie, name='movie'),
     path('answer/', views.answer, name='answer'),
-    path('rec_movie/', views.recommand, name='recommand'),
+    path('rec_movie/', views.recommend, name='recommand'),
+    path('words/', views.get_words, name='words')
 ]

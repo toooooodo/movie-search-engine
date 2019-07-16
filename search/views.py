@@ -256,7 +256,12 @@ def answer(request):
     return HttpResponse(json.dumps(res), content_type='application/json')
 
 
-def recommand(request):
+def recommend(request):
     data = json.loads(request.body)
     id = data['id']
     return HttpResponse(json.dumps(re.process(record.get_list())), content_type='application/json')
+
+
+def get_words(request):
+    print('get_words')
+    return HttpResponse(json.dumps(record.get_cloud()), content_type='application/json')
