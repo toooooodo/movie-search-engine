@@ -130,10 +130,6 @@ def do_search(request):
 
 
 def movie(request):
-    # record = request.COOKIES.get('record')
-    # record = request.session.get('record')
-    # print('record', record)
-    # print('session', request.session.get())
     data = json.loads(request.body)
     id = data['id']
     print(id)
@@ -248,7 +244,7 @@ def movie(request):
     response = HttpResponse(json.dumps(this_movie), content_type='application/json')
     # response = JsonResponse(this_movie, request)
     # request.session['record'] = ','.join(record)
-    print(record)
+    print(record.get_cloud())
     # response.set_cookie('record', ','.join(record), max_age=7 * 24 * 3600, path='/', domain='.localhost')
     return response
 

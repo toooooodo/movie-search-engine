@@ -713,24 +713,32 @@ class Record:
 
     def get_cloud(self):
         cloud_dic = dict()
-        cloud_list = self.get_list()
-        for id in cloud_list:
+        record_list = self.get_list()
+        cloud_list = []
+        for i, id in enumerate(record_list[::-1]):
+            # print(i, id)
+            weight = 10 - i
             s = Movie.search()
             s = s.query("match", id=id)
             result = s.execute().hits[0]
             if result.__contains__('actors'):
                 for actor in result.actors:
                     if actor.__contains__('actor'):
-                        cloud_dic[actor['actor']] = cloud_dic.get(actor['actor'], 0)
+                        cloud_dic[actor['actor']] = cloud_dic.get(actor['actor'], 0) + weight
             if result.__contains__('directors'):
                 for director in result.directors:
                     if director.__contains__('director'):
-                        cloud_dic[director['director']] = cloud_dic.get(director['director'], 0)
+                        cloud_dic[director['director']] = cloud_dic.get(director['director'], 0) + weight
             if result.__contains__('categories'):
                 for category in result.categories:
                     if category.__contains__('category'):
-                        cloud_dic[category['category']] = cloud_dic.get(category['category'], 0)
-        return cloud_dic
+                        cloud_dic[category['category']] = cloud_dic.get(category['category'], 0) + weight
+        for key, value in cloud_dic.items():
+            dic = dict()
+            dic['name'] = key
+            dic['value'] = value
+            cloud_list.append(dic)
+        return cloud_list
 
 
 if __name__ == '__main__':
