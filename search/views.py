@@ -3,16 +3,16 @@ from django.shortcuts import render
 # Create your views here.
 from elasticsearch_dsl import Search
 # from search.models import MyUser
-from search.models import Movie, Question, Recommand
+from search.models import Movie, Question, Recommand, Record
 import json, uuid
 from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
 
 q = Question()
 re = Recommand()
+record = Record()
 
 
 def do_search(request):
-    print('do search')
     data = json.loads(request.body)
     data['id'] = uuid.uuid4()
     res = []
@@ -130,12 +130,13 @@ def do_search(request):
 
 
 def movie(request):
-    record = request.COOKIES.get('record')
+    # record = request.COOKIES.get('record')
     # record = request.session.get('record')
-    print('record', record)
+    # print('record', record)
     # print('session', request.session.get())
     data = json.loads(request.body)
     id = data['id']
+    print(id)
     from elasticsearch_dsl.connections import connections
     connections.create_connection(hosts=["localhost"])
 
@@ -243,19 +244,12 @@ def movie(request):
     this_movie['comment_rate_list'] = comment_rate_list
 
     # print(json.dumps(result.body))
-    if record is not None:
-        record = record.split(',')
-        if len(record) < 10:
-            record.append(str(id))
-        else:
-            record.pop()
-            record.append(str(id))
-    else:
-        record = str(id)
+    record.add(id)
     response = HttpResponse(json.dumps(this_movie), content_type='application/json')
     # response = JsonResponse(this_movie, request)
     # request.session['record'] = ','.join(record)
-    response.set_cookie('record', ','.join(record), max_age=7 * 24 * 3600, domain='http://localhost:3000/app/form')
+    print(record)
+    # response.set_cookie('record', ','.join(record), max_age=7 * 24 * 3600, path='/', domain='.localhost')
     return response
 
 
@@ -269,4 +263,4 @@ def answer(request):
 def recommand(request):
     data = json.loads(request.body)
     id = data['id']
-    return HttpResponse(json.dumps(re.process([21012, 9, 13041])), content_type='application/json')
+    return HttpResponse(json.dumps(re.process(record.get_list())), content_type='application/json')

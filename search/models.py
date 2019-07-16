@@ -13,7 +13,6 @@ import math
 import json
 import os
 
-
 connections.create_connection(hosts=['localhost'])
 
 
@@ -693,13 +692,47 @@ class Recommand:
                 dic['rating'] = 0
             dic['id'] = id
             return_result.append(dic)
-        print(return_result)
-        print(len(return_result))
         return return_result
+
+
+class Record:
+    def __init__(self):
+        self.record = '12365,12370,440,12374,9571'
+
+    def add(self, id):
+        record_list = self.record.split(',')
+        if len(record_list) == 10:
+            record_list.pop(0)
+
+        record_list.append(str(id))
+        self.record = ','.join(record_list)
+
+    def get_list(self):
+        print(self.record)
+        return list(map(int, self.record.split(',')))
+
+    def get_cloud(self):
+        cloud_dic = dict()
+        cloud_list = self.get_list()
+        for id in cloud_list:
+            s = Movie.search()
+            s = s.query("match", id=id)
+            result = s.execute().hits[0]
+            if result.__contains__('actors'):
+                for actor in result.actors:
+                    if actor.__contains__('actor'):
+                        cloud_dic[actor['actor']] = cloud_dic.get(actor['actor'], 0)
+            if result.__contains__('directors'):
+                for director in result.directors:
+                    if director.__contains__('director'):
+                        cloud_dic[director['director']] = cloud_dic.get(director['director'], 0)
+            if result.__contains__('categories'):
+                for category in result.categories:
+                    if category.__contains__('category'):
+                        cloud_dic[category['category']] = cloud_dic.get(category['category'], 0)
+        return cloud_dic
 
 
 if __name__ == '__main__':
     re = Recommand()
     re.process([21012, 9, 13041])
-
-
