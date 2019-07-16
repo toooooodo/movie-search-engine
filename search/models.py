@@ -1,9 +1,3 @@
-import os
-
-from django.db import models
-
-# Create your models here.
-
 import jieba as jb
 from jieba import posseg
 import re
@@ -15,6 +9,10 @@ from elasticsearch_dsl.connections import connections
 from elasticsearch_dsl.analysis import CustomAnalyzer as _CustomAnalyzer
 from py2neo import Graph, Node, Relationship, NodeMatcher
 from django.conf import settings
+import math
+import json
+import os
+
 
 connections.create_connection(hosts=['localhost'])
 
@@ -139,7 +137,7 @@ class QuestionClassify:
         train_y = []
         # with open(settings.BASE_DIR+'/static/search/question/question_classification.txt', 'r') as ff:
         #     print('yes')
-        file_list = self.getfilelist(settings.BASE_DIR+"/static/search/question/")
+        file_list = self.getfilelist(settings.BASE_DIR + "/static/search/question/")
         print('file_list', file_list)
         # 遍历所有文件
         for i, one_file in enumerate(file_list):
@@ -506,7 +504,9 @@ class Question:
     def __init__(self):
         self.classify = QuestionClassify()
         self.template = QuestionTemplate()
-        with(open(settings.BASE_DIR+"/static/search/question/question_classification.txt", "r", encoding="utf-8")) as f:
+        with(
+                open(settings.BASE_DIR + "/static/search/question/question_classification.txt", "r",
+                     encoding="utf-8")) as f:
             question_mode_list = f.readlines()
         self.question_mode_dict = {}
         for one_mode in question_mode_list:
@@ -530,7 +530,7 @@ class Question:
         return self.answer
 
     def label(self, raw):
-        jb.load_userdict(settings.BASE_DIR+'/static/search/user-dic.txt')
+        jb.load_userdict(settings.BASE_DIR + '/static/search/user-dic.txt')
         clean_question = re.sub("[\s+\.\!\/_,$%^*(+\"\')]+|[+——()?【】“”！，。？、~@#￥%……&*（）]+", "", raw)
         self.clean_question = clean_question
         question_seged = posseg.cut(str(clean_question))
@@ -577,6 +577,129 @@ class Question:
         return answer
 
 
+class Recommand:
+
+    def __init__(self):
+        self.graph = Query()
+        self.movie_data = self.read_JSON()
+
+    def read_JSON(self):
+        jf = open(settings.BASE_DIR + '/static/search/movie.json', "r", encoding="UTF-8")
+        json_dict = json.load(jf)
+        jf.close()
+        return json_dict
+
+    def calculateSimilarity(self, name, vector, attr, movieData):
+        dis_dict = {}
+        for item in movieData:
+            if item["title"] in name:
+                continue
+            attribute = item[attr]
+            dis = 0
+            for i in vector.keys():
+                if i in attribute:
+                    dis += (vector[i] - 1) ** 2
+                else:
+                    dis += vector[i] ** 2
+            for i in attribute:
+                if i not in vector.keys():
+                    dis += 1
+            dis_dict[item["id"]] = dis
+        return dis_dict
+
+    def prepare(self, record):
+        user_data = []
+        for i in record:
+            dic = dict()
+
+            '''
+            match (m:Movie)<-[:act_in]-(c:Celebrity) where m.mid=10 return m,c
+            '''
+            cql = f"match (m:Movie)<-[:act_in]-(c:Celebrity) where m.mid={i} return c.name"
+            result = self.graph.query(cql)
+            dic['actors'] = result.copy()
+            cql = f"match (m:Movie)<-[:direct]-(c:Celebrity) where m.mid={i} return c.name"
+            result = self.graph.query(cql)
+            dic['directors'] = result.copy()
+            cql = f"match (m:Movie)-[:is]->(c:Category) where m.mid={i} return c.name"
+            result = self.graph.query(cql)
+            dic['category'] = result.copy()
+            cql = f"match (m:Movie) where m.mid={i} return m"
+            result = self.graph.query(cql)
+            dic['title'] = result[0].__getitem__('title')
+            user_data.append(dic)
+        # print(user_data)
+        return user_data
+
+    def process(self, record):
+        user_data = self.prepare(record)
+        name = []
+        categoty = {}
+        director = {}
+        actor = {}
+        for item in user_data:
+            name.append(item["title"])
+            for cate in item["category"]:
+                if cate not in categoty.keys():
+                    categoty[cate] = 1
+                else:
+                    categoty[cate] += 1
+            for dire in item["directors"]:
+                if dire not in director.keys():
+                    director[dire] = 1
+                else:
+                    director[dire] += 1
+            for actr in item["actors"]:
+                if actr not in actor.keys():
+                    actor[actr] = 1
+                else:
+                    actor[actr] += 1
+        res = {}
+        return_result = []
+        res_category = self.calculateSimilarity(name, categoty, "category", self.movie_data)
+        res_director = self.calculateSimilarity(name, director, "director", self.movie_data)
+        res_actor = self.calculateSimilarity(name, actor, "actor", self.movie_data)
+        for i in res_category.keys():
+            res[i] = 0.6 * math.sqrt(res_category[i]) + 0.4 * math.sqrt(res_actor[i]) + 0.3 * math.sqrt(res_director[i])
+        res = sorted(res.items(), key=lambda d: d[1])
+        for i in range(100):
+            # print(res[i][0])
+            id = res[i][0]
+            dic = dict()
+            s = Movie.search()
+            s = s.query("match", id=id)
+            result = s.execute().hits[0]
+            actor_list = []
+            if result.__contains__('title'):
+                dic['title'] = result.title
+            else:
+                dic['title'] = ''
+            if result.__contains__('img'):
+                dic['img'] = result.img
+            else:
+                dic['img'] = '/static/media/default.1fa9cf77.png'
+            if result.__contains__('actors'):
+                for actor in result.actors:
+                    if actor.__contains__('actor'):
+                        actor_list.append(actor['actor'])
+                    else:
+                        actor_list.append('暂无演员信息')
+            else:
+                actor_list.append('暂无演员信息')
+            dic['actors'] = actor_list
+            if result.__contains__('rating'):
+                dic['rating'] = result.rating
+            else:
+                dic['rating'] = 0
+            dic['id'] = id
+            return_result.append(dic)
+        print(return_result)
+        print(len(return_result))
+        return return_result
+
+
 if __name__ == '__main__':
-    q = Question()
-    print(q.process('哪些演员参演过姜文导演的电影'))
+    re = Recommand()
+    re.process([21012, 9, 13041])
+
+

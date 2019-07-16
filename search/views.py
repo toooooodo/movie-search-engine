@@ -1,21 +1,19 @@
 from django.shortcuts import render
 
 # Create your views here.
-from django.shortcuts import render, redirect
-from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search
-from elasticsearch_dsl import DocType, Date, Nested, Boolean, Integer, \
-    analyzer, Completion, Keyword, Text, Q, InnerObject
-from search.models import Movie, Question
+# from search.models import MyUser
+from search.models import Movie, Question, Recommand
 import json, uuid
-from django.http import HttpResponse
-from django.shortcuts import render
+from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
 
 q = Question()
+re = Recommand()
+
 
 def do_search(request):
+    print('do search')
     data = json.loads(request.body)
-    print("data:", data)
     data['id'] = uuid.uuid4()
     res = []
 
@@ -80,8 +78,6 @@ def do_search(request):
 
     response = s.execute()
 
-    print("搜索总条数：", response.hits.total)
-
     thisMovie = {}
     index = 0
 
@@ -116,34 +112,30 @@ def do_search(request):
             else:
                 tmpTime = 0
 
-            print("上映时间: ", tmpTime)
-
             for category in hit.categories:
                 if category.__contains__('category'):
                     type_list.append(category['category'])
-            print(type_list)
 
             # 时间过滤
             if lower_time <= tmpTime <= higher_time:
                 # print("tmpTime:" , tmpTime)
                 # 类型过滤
                 if movie_type == "all_type" or movie_type in type_list:
-                    print("movie_type:", movie_type, "tmpTime:", tmpTime)
+                    # print("movie_type:", movie_type, "tmpTime:", tmpTime)
                     res.append(thisMovie.copy())
 
             index += 1
-
-    print(len(res))
-    print(res)
 
     return HttpResponse(json.dumps(res), content_type='application/json')
 
 
 def movie(request):
     record = request.COOKIES.get('record')
+    # record = request.session.get('record')
+    print('record', record)
+    # print('session', request.session.get())
     data = json.loads(request.body)
     id = data['id']
-
     from elasticsearch_dsl.connections import connections
     connections.create_connection(hosts=["localhost"])
 
@@ -250,7 +242,6 @@ def movie(request):
     this_movie['comment_time_list'] = comment_time_list
     this_movie['comment_rate_list'] = comment_rate_list
 
-    print(this_movie)
     # print(json.dumps(result.body))
     if record is not None:
         record = record.split(',')
@@ -262,13 +253,20 @@ def movie(request):
     else:
         record = str(id)
     response = HttpResponse(json.dumps(this_movie), content_type='application/json')
-    response.set_cookie('record', ','.join(record))
+    # response = JsonResponse(this_movie, request)
+    # request.session['record'] = ','.join(record)
+    response.set_cookie('record', ','.join(record), max_age=7 * 24 * 3600, domain='http://localhost:3000/app/form')
     return response
 
 
 def answer(request):
     data = json.loads(request.body)
-    print("data is:" , data)
     res = {"answer": q.process(data['question'])}
 
     return HttpResponse(json.dumps(res), content_type='application/json')
+
+
+def recommand(request):
+    data = json.loads(request.body)
+    id = data['id']
+    return HttpResponse(json.dumps(re.process([21012, 9, 13041])), content_type='application/json')
