@@ -237,12 +237,14 @@ class QuestionTemplate:
             # 获取电影名称
             name = self.question_word[tag_index]
             return name
-        else:
+        elif name_count > 1:
             result_list = []
             for i, flag in enumerate(self.question_flag):
                 if flag == str(type_str):
                     result_list.append(self.question_word[i])
             return result_list
+        else:
+            raise BaseException
 
     def get_num_x(self):
         x = re.sub(r'\D', "", "".join(self.question_word))
