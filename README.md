@@ -9,7 +9,7 @@
 - elasticsearch-rtf
 
 Python依赖
-- pip install -r requirement.txt
+- pip install -r requirements.txt
 
 ## **知识图谱**
 
