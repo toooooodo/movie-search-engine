@@ -30,6 +30,8 @@ Python依赖
 - act_in
 - direct
 
+![avatar](img/graph.png)
+
 ## 系统模块：
 - 搜索
 - 电影详情
